@@ -18,7 +18,7 @@ int num_of_nodes;
 
  struct node{
    dlist *neighbours;
-   const char *name;
+    char *name;
    bool seen;
  };
 
@@ -68,14 +68,15 @@ int num_of_nodes;
 
     // create new node
     node *new_node = malloc(sizeof(*new_node));
-
+    char *node_name = (char*)malloc(sizeof(strlen(s))+1);
     // set links and insert in list of nodes
-    new_node->name = s;
+    strcpy(node_name, s);
+    new_node->name = node_name;
     new_node->neighbours = dlist_empty(NULL);
     new_node->seen = false;
     dlist_insert(g->nodes, new_node, dlist_first(g->nodes));
 
-    printf("insert node %s to graph\n", new_node->name);
+  printf("insert node %s to graph\n", new_node->name);
 
     //free(new_node);
     return g;
@@ -101,17 +102,16 @@ int num_of_nodes;
     while(!dlist_is_end(g->nodes, pos)){
 
       // create comparing node
-      node *inspected = malloc(sizeof(*inspected));
-      inspected = dlist_inspect(g->nodes, pos);
+      node *inspected = dlist_inspect(g->nodes, pos);
 
-      printf("compare name %s to node %s stored in graph\n",s,inspected->name);
-      if(inspected->name == s){
+      //printf("compare name %s to node %s stored in graph\n",s,inspected->name);
+      if(strncmp(inspected->name, s, strlen(s)+1)==0){
         printf("node found!\n");
         return inspected;
       };
 
       pos = dlist_next(g->nodes, pos);
-      //free(inspected);
+
     };
 
     return NULL;
@@ -132,21 +132,18 @@ int num_of_nodes;
   graph *graph_insert_edge(graph *g, node *n1, node *n2){
 
     node *dest = malloc(sizeof(*dest));
+    char *dest_name = (char*)malloc(sizeof(strlen(n2->name))+1);
 
-    const char *dest_name = malloc(sizeof(*dest_name));
-
-
-    // get name of node 2 and insert edge from node 1 to node 2
-    dest_name = n2->name;
-
+    // copy name and set links
+    strcpy(dest_name, n2->name);
     dest->name = dest_name;
     dest->neighbours = NULL;
     dest->seen = false;
 
-    // insert edge meaning add n2 in n1's neighbours list
+    //add n2 in n1's neighbours list
     dlist_insert(n1->neighbours, dest, dlist_first(n1->neighbours));
 
-
+    //free(dest_name);
     return g;
   }
 
@@ -161,28 +158,67 @@ int num_of_nodes;
    */
   void graph_print(const graph *g){
 
+  // iterate through nodes and print node name
   dlist_pos pos = dlist_first(g->nodes);
 
   while(!dlist_is_end(g->nodes, pos)){
-    node *inspect = malloc(sizeof(*inspect));
+    node *inspect = dlist_inspect(g->nodes, pos);
+    printf("%s ->\n", inspect->name);
 
-    inspect = dlist_inspect(g->nodes, pos);
-    printf("%s\n", inspect->name);
-
+    // iterate through nodes neighbours and print neighbour names
     dlist_pos pos2 = dlist_first(inspect->neighbours);
 
     while(!dlist_is_end(inspect->neighbours, pos2)){
-      node *inspect2 = malloc(sizeof(*inspect2));
-      inspect2 = dlist_inspect(inspect->neighbours, pos2);
-      printf("neighbour %s\n", inspect2->name);
+      node *inspect2 = dlist_inspect(inspect->neighbours, pos2);
+      printf(" %s\n", inspect2->name);
 
       pos2 = dlist_next(inspect->neighbours, pos2);
-      //free(inspect2);
+
     };
 
-    //free(inspect);
+
     pos = dlist_next(g->nodes, pos);
 
-  }
+  };
 
-  }
+};
+
+  /**
+   * graph_kill() - Destroy a given graph.
+   * @g: Graph to destroy.
+   *
+   * Return all dynamic memory used by the graph.
+   *
+   * Returns: Nothing.
+   */
+  void graph_kill(graph *g){
+    // iterate through nodes in graph
+    dlist_pos pos1 = dlist_first(g->nodes);
+    while(!dlist_is_end(g->nodes, pos1)){
+      node *inspect1 = dlist_inspect(g->nodes, pos1);
+
+      //iterate over nodes list of neighbours
+      dlist_pos pos2 = dlist_first(inspect1->neighbours);
+      while(!dlist_is_end(inspect1->neighbours,pos2)){
+        node *inspect2 = dlist_inspect(inspect1->neighbours,pos2);
+
+        // free neighbour
+        free(inspect2->name);
+        free(inspect2->neighbours);
+        free(inspect2);
+
+        pos2=dlist_next(inspect1->neighbours, pos2);
+      };
+
+      // kill naighbour list and free node
+      dlist_kill(inspect1->neighbours);
+      free(inspect1->name);
+      free(inspect1);
+
+      pos1 = dlist_next(g->nodes, pos1);
+    };
+
+    // kill node list and free graph
+    dlist_kill(g->nodes);
+    free(g);
+  };
