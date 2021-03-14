@@ -6,8 +6,9 @@
 
 #include "graph.h"
 #include "dlist.h"
-#include "list.h"
 #include "util.h"
+#include "queue.h"
+#include "list.h"
 
 //global var
 int num_of_edges;
@@ -34,7 +35,6 @@ gcc -std=c99 -Wall -o main is_connected.c graph.c dlist.c
 char *ignore_white_space(char *line){
   bool white_space = true;
   int length = strlen(line);
-  printf(" length of line %d\n", length);
   int char_count = 0;
   while(white_space){
     // se if char at char_count is white space character
@@ -73,11 +73,16 @@ char *ignore_white_space(char *line){
 
   return line;
 };
-/*
 
+/* build_graph() - builds graph from file
+* @map - File from which graph is built
+*
+* NOTE - File must contain same amount of edges as declared
+*
+* Returns - A new graph with nodes and edges
 */
 graph *build_graph(FILE *map){
-  // create buffer string assumed each line contains less than 256 chars
+  // create buffer string assbmad each line contains less than 256 chars
   graph *g = NULL;
   int buff_size = 256;
   char *buff = calloc(buff_size,sizeof(char));
@@ -97,7 +102,6 @@ graph *build_graph(FILE *map){
     // store create graph with max number of nodes and continue
     }else if(isdigit(buff[0]) ){
       num_of_edges = atoi(&buff[0]);
-      printf("%d\n", num_of_edges);
       g = graph_empty(2*num_of_edges);
       continue;
     }else{
@@ -114,10 +118,6 @@ graph *build_graph(FILE *map){
       //node names can be maximum of 40 chars
       char *origin_name = (char*)malloc(40*sizeof(char)+1);
       char *dest_name = (char*)malloc(40*sizeof(char)+1);
-
-
-      sscanf(line, "%s %s", origin_name, dest_name);
-      //printf("%s %s\n",origin_name, dest_name);
 
       // see if nodes is already in graph: if not -> insert nodes
 
@@ -152,13 +152,65 @@ graph *build_graph(FILE *map){
     exit(EXIT_FAILURE);
   };
 
+
   fclose(map);
   free(buff);
   return g;
 };
 
+void add_to_queue(queue *q, graph *g, node *n){
+  queue_enqueue(q,n);
+  graph_node_set_seen(g, n, true);
+}
 
+/* find_path() - See if path exists between source node and destination node.
+* @g - Graph to inspect1.
+* @src - Source node.
+* @dest - Destination node.
+*
+* Returns - true if path exists, else false
+*/
+bool find_path(graph *g,node *src,node *dest){
+   node *src_node = src;
+   node *dest_node = dest;
+   queue *q = queue_empty(NULL);
 
+   add_to_queue(q,g,src_node);
+
+   while(!queue_is_empty(q)){
+     // get node from queue and check if node is destination node
+     // and get neighbour list from node first in queue
+     node *first_node = queue_front(q);
+     dlist *neighbours = graph_neighbours(g, first_node);
+
+     //iterate through neighbour list
+     dlist_pos pos = dlist_first(neighbours);
+     while(!dlist_is_end(neighbours, pos)){
+       // get node from list and check if node is destination node
+       node *inspected_node = dlist_inspect(neighbours, pos);
+       if(nodes_are_equal(inspected_node, dest_node)){
+
+         queue_kill(q);
+         graph_reset_seen(g);
+         return true;
+       };
+       // if neighbour node is not seen, add to queue
+       if(!graph_node_is_seen(g, inspected_node)){
+         add_to_queue(q,g,inspected_node);
+       };
+
+       pos = dlist_next(neighbours, pos);
+     };
+
+     // when all neighbours have been checked delete from queue
+     queue_dequeue(q);
+   };
+
+  queue_kill(q);
+
+  graph_reset_seen(g);
+  return false;
+};
 
 /*
 
@@ -170,7 +222,7 @@ int main(int argc, char *argv[]) {
     exit(EXIT_FAILURE);
   }
 
-  //open and read second argument passed through file
+  //open and read second argbmant passed through file
   FILE *node_map = fopen(argv[1],"r");
 
   //check if file exists, print error message if not
@@ -181,9 +233,41 @@ int main(int argc, char *argv[]) {
 
   graph *graph = build_graph(node_map);
 
-  
+  bool running = true;
+  char *input = malloc(2*40*sizeof(char));
+  //node names can be maximum of 40 chars
+  char *origin_name = (char*)malloc(40*sizeof(char)+1);
+  char *dest_name = (char*)malloc(40*sizeof(char)+1);
+  while(running){
 
-  graph_print(graph);
+
+    printf("Enter origin and destination (quit to exit): ");
+    fgets(input, 2*40, stdin);
+    sscanf(input, "%s %s", origin_name, dest_name);
+    node *origin_node = graph_find_node(graph, origin_name);
+    node *dest_node = graph_find_node(graph, dest_name);
+    if(strcmp(origin_name, "quit")==0){
+      running = false;
+    };
+
+    if(origin_node == NULL){
+      printf("No origin exists with that name. Try Again.\n");
+      continue;
+    }
+    if(dest_node == NULL){
+      printf("No destination exists with that name. Try Again.\n");
+      continue;
+    }
+    if(find_path(graph, origin_node, dest_node)){
+      printf("There is a path from %s to %s.\n", origin_name, dest_name);
+    }else{
+      printf("There is no path from %s to %s.\n", origin_name, dest_name);
+    }
+  };
+
+  free(input);
+  free(origin_name);
+  free(dest_name);
   graph_kill(graph);
   return 0;
 

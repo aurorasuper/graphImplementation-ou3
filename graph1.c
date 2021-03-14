@@ -14,6 +14,8 @@
 
 // =========GLOBAL VARIABLE============
 int num_of_nodes;
+
+
  // ===========INTERNAL DATA TYPES============
 
  struct node{
@@ -24,6 +26,28 @@ int num_of_nodes;
 
  struct graph{
    dlist *nodes;
+ };
+
+
+ // =================== NODE COMPARISON FUNCTION ======================
+
+ /**
+  * nodes_are_equal() - Check whether two nodes are equal.
+  * @n1: Pointer to node 1.
+  * @n2: Pointer to node 2.
+  *
+  * Returns: true if the nodes are considered equal, otherwise false.
+  *
+  */
+ bool nodes_are_equal(const node *n1,const node *n2){
+   char *n1_copy = n1->name;
+   char *n2_copy = n2->name;
+   if(strcmp(n1_copy, n2_copy)==0){
+
+     return true;
+   };
+
+   return false;
  };
 
 
@@ -76,9 +100,6 @@ int num_of_nodes;
     new_node->seen = false;
     dlist_insert(g->nodes, new_node, dlist_first(g->nodes));
 
-  printf("insert node %s to graph\n", new_node->name);
-
-    //free(new_node);
     return g;
   };
 
@@ -101,12 +122,10 @@ int num_of_nodes;
     dlist_pos pos = dlist_first(g->nodes);
     while(!dlist_is_end(g->nodes, pos)){
 
-      // create comparing node
+      // compare node name to char array, if true -> return pointer to the
+      // found node
       node *inspected = dlist_inspect(g->nodes, pos);
-
-      //printf("compare name %s to node %s stored in graph\n",s,inspected->name);
       if(strncmp(inspected->name, s, strlen(s)+1)==0){
-        printf("node found!\n");
         return inspected;
       };
 
@@ -130,23 +149,104 @@ int num_of_nodes;
    */
 
   graph *graph_insert_edge(graph *g, node *n1, node *n2){
-
-    node *dest = malloc(sizeof(*dest));
-    char *dest_name = (char*)malloc(sizeof(strlen(n2->name))+1);
-
-    // copy name and set links
-    strcpy(dest_name, n2->name);
-    dest->name = dest_name;
-    dest->neighbours = NULL;
-    dest->seen = false;
-
-    //add n2 in n1's neighbours list
+    node *dest;
+    // iterate through nodes in graph and copy pointer to n2
+    dlist_pos  pos = dlist_first(g->nodes);
+    while(!dlist_is_end(g->nodes,pos)){
+      node* inspect = dlist_inspect(g->nodes, pos);
+      if(nodes_are_equal(n2, inspect)){
+        dest = inspect;
+      }
+      pos = dlist_next(g->nodes, pos);
+    }
+    // insert pointer to n2 in n1's list of neighbours
     dlist_insert(n1->neighbours, dest, dlist_first(n1->neighbours));
 
-    //free(dest_name);
     return g;
-  }
+  };
 
+  /**
+   * graph_node_is_seen() - Return the seen status for a node.
+   * @g: Graph storing the node.
+   * @n: Node in the graph to return seen status for.
+   *
+   * Returns: The seen status for the node.
+   */
+  bool graph_node_is_seen(const graph *g, const node *n){
+    if(n->seen){
+      return true;
+    }
+    return false;
+  };
+
+
+  /**
+   * graph_node_set_seen() - Set the seen status for a node.
+   * @g: Graph storing the node.
+   * @n: Node in the graph to set seen status for.
+   * @s: Status to set.
+   *
+   * Returns: The modified graph.
+   */
+  graph *graph_node_set_seen(graph *g, node *n, bool seen){
+    n->seen = seen;
+    return g;
+  };
+
+
+  /**
+   * graph_reset_seen() - Reset the seen status on all nodes in the graph.
+   * @g: Graph to modify.
+   *
+   * Returns: The modified graph.
+   */
+  graph *graph_reset_seen(graph *g){
+    // iterate through nodes and set seen status to false (default)
+    dlist_pos node_pos = dlist_first(g->nodes);
+
+    while(!dlist_is_end(g->nodes, node_pos)){
+      node *inspected_node = dlist_inspect(g->nodes, node_pos);
+      inspected_node->seen = false;
+
+      //iterate through nodes neighbours and set seen status to false (default)
+      dlist_pos neighbour_pos = dlist_first(inspected_node->neighbours);
+      while (!dlist_is_end(inspected_node->neighbours, neighbour_pos)){
+        node *inspected_neighbour = dlist_inspect(inspected_node->neighbours,
+        neighbour_pos);
+        inspected_neighbour->seen = false;
+
+        neighbour_pos = dlist_next(inspected_node->neighbours, neighbour_pos);
+      };
+
+      node_pos = dlist_next(g->nodes, node_pos);
+    };
+    return g;
+  };
+
+  /**
+   * graph_neighbours() - Return a list of neighbour nodes.
+   * @g: Graph to inspect.
+   * @n: Node to get neighbours for.
+   *
+   * Returns: A pointer to a list of nodes. Note: The list must be
+   * dlist_kill()-ed after use.
+   */
+  dlist *graph_neighbours(const graph *g,const node *n){
+    dlist *neighbours;
+
+    // iterate through nodes in graph and get list of neighbours
+    dlist_pos pos = dlist_first(g->nodes);
+    while (!dlist_is_end(g->nodes,pos)) {
+      node *inspected_node = dlist_inspect(g->nodes, pos);
+      if(nodes_are_equal(n,inspected_node)){
+        neighbours = inspected_node->neighbours;
+      }
+      pos = dlist_next(g->nodes, pos);
+    }
+
+    return neighbours;
+
+  };
 
   /**
    * graph_print() - Iterate over the graph elements and print their values.
@@ -163,14 +263,13 @@ int num_of_nodes;
 
   while(!dlist_is_end(g->nodes, pos)){
     node *inspect = dlist_inspect(g->nodes, pos);
-    printf("%s ->\n", inspect->name);
 
     // iterate through nodes neighbours and print neighbour names
     dlist_pos pos2 = dlist_first(inspect->neighbours);
 
     while(!dlist_is_end(inspect->neighbours, pos2)){
       node *inspect2 = dlist_inspect(inspect->neighbours, pos2);
-      printf(" %s\n", inspect2->name);
+      printf("%s -> %s\n", inspect->name, inspect2->name);
 
       pos2 = dlist_next(inspect->neighbours, pos2);
 
@@ -197,22 +296,10 @@ int num_of_nodes;
     while(!dlist_is_end(g->nodes, pos1)){
       node *inspect1 = dlist_inspect(g->nodes, pos1);
 
-      //iterate over nodes list of neighbours
-      dlist_pos pos2 = dlist_first(inspect1->neighbours);
-      while(!dlist_is_end(inspect1->neighbours,pos2)){
-        node *inspect2 = dlist_inspect(inspect1->neighbours,pos2);
-
-        // free neighbour
-        free(inspect2->name);
-        free(inspect2->neighbours);
-        free(inspect2);
-
-        pos2=dlist_next(inspect1->neighbours, pos2);
-      };
-
-      // kill naighbour list and free node
+      // kill neighbour list and free node
       dlist_kill(inspect1->neighbours);
       free(inspect1->name);
+
       free(inspect1);
 
       pos1 = dlist_next(g->nodes, pos1);
